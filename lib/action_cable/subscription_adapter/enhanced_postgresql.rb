@@ -13,7 +13,7 @@ module ActionCable
       LARGE_PAYLOADS_TABLE = "action_cable_large_payloads"
       CREATE_LARGE_TABLE_QUERY = <<~SQL
         CREATE UNLOGGED TABLE IF NOT EXISTS #{LARGE_PAYLOADS_TABLE} (
-          id SERIAL PRIMARY KEY,
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
           payload TEXT NOT NULL,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -43,7 +43,7 @@ module ActionCable
           if payload.bytesize > MAX_NOTIFY_SIZE
             payload_id = insert_large_payload(pg_conn, payload)
 
-            if payload_id % INSERTS_PER_DELETE == 0
+            if payload_id[0, 2].to_i(16) % INSERTS_PER_DELETE == 0
               pg_conn.exec(DELETE_LARGE_PAYLOAD_QUERY)
             end
 
@@ -99,7 +99,7 @@ module ActionCable
 
       def insert_large_payload(pg_conn, payload)
         result = pg_conn.exec_params(INSERT_LARGE_PAYLOAD_QUERY, [payload])
-        result.first.fetch("id").to_i
+        result.first.fetch("id")
       rescue PG::UndefinedTable
         pg_conn.exec(CREATE_LARGE_TABLE_QUERY)
         pg_conn.exec(CREATE_CREATED_AT_INDEX_QUERY)
